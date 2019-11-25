@@ -795,24 +795,26 @@ class AuthController extends ControllerBase {
       ];
 
       foreach ($mappings as $mapping) {
-        $this->auth0Logger->notice('mapping ' . $mapping);
+        list($src, $dst) = $mapping;
+        $this->auth0Logger->notice(sprintf('mapping from %s to %s', $src, $dst));
 
-        $key = $mapping[1];
-        if (in_array($key, $skip_mappings)) {
-          $this->auth0Logger->notice('skipping mapping handled already by Auth0 module ' . $mapping);
+        if (in_array($dst, $skip_mappings)) {
+          $this->auth0Logger->notice(sprintf('skipping mapping handled already by Auth0 module (%s => %s)', $src, $dst));
+          continue;
         }
-        else {
-          $value = isset($userInfo[$mapping[0]]) ? $userInfo[$mapping[0]] : '';
-          $current_value = $user->get($key)->value;
-          if ($current_value === $value) {
-            $this->auth0Logger->notice('value is unchanged ' . $key);
-          }
-          else {
-            $this->auth0Logger->notice('value changed ' . $key . ' from [' . $current_value . '] to [' . $value . ']');
-            $edit[$key] = $value;
-            $user->set($key, $value);
-          }
+
+        $value = isset($userInfo[$src]) ? $userInfo[$src] : '';
+        $current_value = $user->get($dst)->value;
+        if ($current_value === $value) {
+          $this->auth0Logger->notice(sprintf('value is unchanged %s', $dst));
+          continue;
         }
+
+        $this->auth0Logger->notice(sprintf('value changed %s from [%s] to [%s]',
+          $dst, $current_value, $value
+        ));
+        $edit[$dst] = $value;
+        $user->set($dst, $value);
       }
     }
   }
@@ -866,18 +868,18 @@ class AuthController extends ControllerBase {
       $user_roles = $user->getRoles();
 
       $new_user_roles = array_merge(array_diff($user_roles, $not_granted), $roles_granted);
-      
+
       $roles_to_add = array_diff($new_user_roles, $user_roles);
       $roles_to_remove = array_diff($user_roles, $new_user_roles);
-      
+
       if (empty($roles_to_add) && empty($roles_to_remove)) {
           $this->auth0Logger->notice('no changes to roles detected');
           return;
-      } 
-         
+      }
+
       $this->auth0Logger->notice('changes to roles detected');
       $edit['roles'] = $new_user_roles;
-      
+
       foreach ($roles_to_add as $new_role) {
           $user->addRole($new_role);
       }
